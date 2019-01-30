@@ -1,0 +1,158 @@
+#!/bin/env ruby
+# coding: utf-8
+
+class Bollinger_val
+  attr_accessor :period, :std_dev, :file_content, :max
+
+  def initialize(period, std_dev, indx_nbr, fd)
+    @file_content = Array.new
+    @period = period
+    @std_dev = std_dev
+    i = 0
+    puts 'INPUT'
+    if ((indx_nbr.to_f() % 1) != 0)
+    then
+      puts "Index: #{indx_nbr.to_f()}"
+    else
+      puts "Index: #{'%.0f' % indx_nbr}"
+    end
+    # puts "Index: #{indx_nbr}"
+
+    if ((period.to_f() % 1) != 0)
+    then
+      puts "Period: #{period.to_f()}"
+    else
+      puts "Period: #{'%.0f' % period}"
+    end
+ #   puts "Period: #{'%.0f' % period}"
+    puts "SD_coef: #{'%.2f' % std_dev}"
+    fd.each_line {|line|
+    if (is_number(line))
+    then
+      @file_content.push(line.to_f())
+      i += 1
+    end
+    }
+    @max = i
+  end
+
+  def moving_average_calc(val, index)
+    i = 0
+    j = 0
+    point = Array.new();
+    moving_average = 0
+    @file_content.each {|line|
+      point = line.to_f()
+      if ( i > index - @period && j < @period)
+      then
+        moving_average += point;
+        j += 1
+      end
+      i += 1
+    }
+    moving_average /= @period
+    puts "MA: #{'%.2f' % moving_average}"
+    return moving_average
+  end
+
+  def standard_deviation(val, moving_deviation, index)
+    i = 0
+    j = 0
+    std_deviation = 0
+    @file_content.each {|lines|
+      point = lines.to_f()
+      if (i > index - @period && j < @period)
+      then
+        std_deviation += (point - moving_deviation)**2;
+        j += 1
+      end
+      i += 1
+    }
+    std_deviation *= (1 / @period)
+    std_deviation **= 0.5
+    puts "SD: #{'%.2f' % std_deviation}"
+    return std_deviation
+  end
+  
+  def bellinger_band(moving_average, std_deviation, val)
+    bollinger_band = [(moving_average + (std_deviation * val.std_dev)), (moving_average - (std_deviation * val.std_dev))]
+    
+    puts "B+: #{'%.2f' % (bollinger_band[0])}"
+    puts "B-: #{'%.2f' % (bollinger_band[1])}"
+
+    return bollinger_band
+  end
+
+  def get_str_from_ind(index)
+    arr = Array.new
+    i = 0
+    until i > index do
+      arr.push(@file_content[i])
+      i += 1
+    end
+    return arr
+  end
+  
+end
+
+def is_number nbr
+  true if Float(nbr) rescue false
+end
+
+def read_file
+  i = 0
+  j = 0
+  fd = File.open(ARGV[2], "r")
+  val = Bollinger_val.new(ARGV[0].to_f(), ARGV[1].to_f(), ARGV[3].to_f(), fd)
+  puts "\nOUTPUT"
+  moving_average = val.moving_average_calc(val, ARGV[3].to_f())
+  std_deviation = val.standard_deviation(val, moving_average, ARGV[3].to_f())
+  val.bellinger_band(moving_average, std_deviation, val)
+end
+
+def bollinger
+  read_file();
+end
+
+def print_help
+puts "Bollinger Bands\n\n"
+puts "USAGE"
+puts "\t./bollinger [-h] period standard_dev indexes_file index_number"
+puts "\tperiod          number of indexes for the moving average"
+puts "\tstandard_dev    standard deviation coefficient to apply"
+puts "\tindexes_file    file containing daily indexes"
+puts "\tindex_number    index number to compute moving average and Bollinger bands"
+puts "OPTIONS"
+puts "\t-h              print the usage and quit."
+end
+
+def bollinger_begin
+  if (ARGV.size() == 1 && ARGV[0] == "-h")
+  then
+    print_help()
+  elsif (ARGV.size() != 4)
+  then
+    STDERR.puts "Bad arguments number"
+    return 84
+  elsif (!is_number(ARGV[0])||
+         !is_number(ARGV[1]) ||
+         !is_number(ARGV[3]))
+  then
+    STDERR.puts "First, second and fourth arguments have to be nbr"
+    return 84
+  elsif (!File.file?(ARGV[2]) || !File.readable?(ARGV[2]))
+  then
+    STDERR.puts "File doesn't name : #{ARGV[2]} doesn't exist or doesn't have read rigth !"
+    return 84
+  else
+    if (bollinger() == 84)
+    then
+      return 84
+    end
+  end
+end
+
+if (bollinger_begin() == 84)
+then
+  return 84
+end
